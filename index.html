@@ -11,6 +11,13 @@
     @media (max-width: 576px) {
       h1 { font-size: 1.5rem; }
     }
+    .note-content {
+      white-space: pre-wrap;
+    }
+    .form-section {
+      max-width: 400px;
+      margin: 0 auto;
+    }
   </style>
 </head>
 <body class="bg-light">
@@ -18,7 +25,7 @@
     <h1 class="mb-4 text-center">📝 Notes App</h1>
 
     <!-- Login Form -->
-    <div id="login-section" class="card p-4 shadow-sm mx-auto" style="max-width: 400px;">
+    <div id="login-section" class="card p-4 shadow-sm form-section">
       <h4 class="mb-3 text-center">Login</h4>
       <form id="login-form">
         <div class="mb-3">
@@ -29,48 +36,103 @@
           <label class="form-label">Password</label>
           <input type="password" id="password" class="form-control" required />
         </div>
+        <div class="mb-3 text-end">
+          <a href="#" id="forgot-password-link">Forgot Password?</a>
+        </div>
         <button class="btn btn-primary w-100">Login</button>
+        <div class="text-center mt-3">
+          <small>Don't have an account? <a href="#" id="register-link">Register</a></small>
+        </div>
+      </form>
+    </div>
+
+    <!-- Register Form -->
+    <div id="register-section" class="card p-4 shadow-sm form-section d-none">
+      <h4 class="mb-3 text-center">Register</h4>
+      <form id="register-form">
+        <div class="mb-3">
+          <label class="form-label">Username</label>
+          <input type="text" id="reg-username" class="form-control" required />
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Email</label>
+          <input type="email" id="reg-email" class="form-control" required />
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Password</label>
+          <input type="password" id="reg-password" class="form-control" required />
+        </div>
+        <button class="btn btn-success w-100">Register</button>
+        <div class="text-center mt-3">
+          <small>Already have an account? <a href="#" id="login-link">Login</a></small>
+        </div>
+      </form>
+    </div>
+
+    <!-- Forgot Password Form -->
+    <div id="forgot-section" class="card p-4 shadow-sm form-section d-none">
+      <h4 class="mb-3 text-center">Reset Password</h4>
+      <form id="forgot-form">
+        <div class="mb-3">
+          <label class="form-label">Username</label>
+          <input type="text" id="forgot-username" class="form-control" required />
+        </div>
+        <button class="btn btn-warning w-100">Send Reset Link</button>
+        <div class="text-center mt-3">
+          <small><a href="#" id="back-to-login">Back to Login</a></small>
+        </div>
       </form>
     </div>
 
     <!-- Notes Interface -->
     <div id="notes-section" class="d-none">
-      <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-        <h4 class="m-0">Create New Note</h4>
-        <button class="btn btn-outline-danger" onclick="logout()">Logout</button>
-      </div>
-
-      <form id="note-form" class="card p-4 shadow-sm mb-4" enctype="multipart/form-data">
-        <div class="mb-3">
-          <input type="text" id="note-title" class="form-control" placeholder="Note title" required />
-        </div>
-        <div class="mb-3">
-          <textarea id="note-content" class="form-control" rows="3" placeholder="Note content" required></textarea>
-        </div>
-        <div class="mb-3">
-          <input type="file" id="note-file" class="form-control" />
-        </div>
-        <button class="btn btn-success w-100">Add Note</button>
-      </form>
-
-      <input type="text" id="search-query" class="form-control mb-3" placeholder="Search notes..." onkeyup="searchNotes()" />
-
-      <ul id="note-list" class="list-group"></ul>
+      <!-- The notes interface is inserted via JavaScript after login -->
     </div>
   </div>
 
   <script>
     const API_URL = 'https://quick-notes-backend-one.vercel.app/api';
     let token = '';
+    let currentEditingNoteId = null;
 
-    document.getElementById('login-form').addEventListener('submit', login);
-    document.getElementById('note-form').addEventListener('submit', createNote);
+    // Link event listeners
+    document.getElementById('register-link')?.addEventListener('click', showRegisterForm);
+    document.getElementById('login-link')?.addEventListener('click', showLoginForm);
+    document.getElementById('forgot-password-link')?.addEventListener('click', showForgotPassword);
+    document.getElementById('back-to-login')?.addEventListener('click', showLoginForm);
 
-    async function login(event) {
-      event.preventDefault();
+    function toggleSections(show) {
+      document.getElementById('login-section').classList.toggle('d-none', show);
+      document.getElementById('register-section').classList.add('d-none');
+      document.getElementById('forgot-section').classList.add('d-none');
+      document.getElementById('notes-section').classList.toggle('d-none', !show);
+    }
+
+    function showLoginForm(e) {
+      if (e) e.preventDefault();
+      document.getElementById('login-section').classList.remove('d-none');
+      document.getElementById('register-section').classList.add('d-none');
+      document.getElementById('forgot-section').classList.add('d-none');
+    }
+
+    function showRegisterForm(e) {
+      if (e) e.preventDefault();
+      document.getElementById('register-section').classList.remove('d-none');
+      document.getElementById('login-section').classList.add('d-none');
+      document.getElementById('forgot-section').classList.add('d-none');
+    }
+
+    function showForgotPassword(e) {
+      if (e) e.preventDefault();
+      document.getElementById('forgot-section').classList.remove('d-none');
+      document.getElementById('login-section').classList.add('d-none');
+      document.getElementById('register-section').classList.add('d-none');
+    }
+
+    document.getElementById('login-form').addEventListener('submit', async function(e) {
+      e.preventDefault();
       const username = document.getElementById('username').value;
       const password = document.getElementById('password').value;
-
       try {
         const res = await fetch(`${API_URL}/auth/login`, {
           method: 'POST',
@@ -89,25 +151,119 @@
       } catch (error) {
         Swal.fire('Error', error.message, 'error');
       }
-    }
+    });
 
-    function logout() {
-      token = '';
-      toggleSections(false);
-      Swal.fire('Logged out', '', 'info');
-    }
+    document.getElementById('register-form').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const username = document.getElementById('reg-username').value;
+      const email = document.getElementById('reg-email').value;
+      const password = document.getElementById('reg-password').value;
+      try {
+        const res = await fetch(`${API_URL}/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, email, password })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+          Swal.fire('Registration successful!', '', 'success');
+          showLoginForm();
+        } else {
+          Swal.fire('Failed', data.message || 'Registration failed', 'error');
+        }
+      } catch (error) {
+        Swal.fire('Error', error.message, 'error');
+      }
+    });
 
-    function toggleSections(isLoggedIn) {
-      document.getElementById('login-section').classList.toggle('d-none', isLoggedIn);
-      document.getElementById('notes-section').classList.toggle('d-none', !isLoggedIn);
-    }
+    document.getElementById('forgot-form').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const username = document.getElementById('forgot-username').value;
+      try {
+        const res = await fetch(`${API_URL}/auth/forgot-password`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+          Swal.fire('Check your email for reset instructions.', '', 'info');
+          showLoginForm();
+        } else {
+          Swal.fire('Error', data.message || 'Failed to send email', 'error');
+        }
+      } catch (error) {
+        Swal.fire('Error', error.message, 'error');
+      }
+    });
 
-    async function fetchNotes() {
+async function fetchNotes() {
+      document.getElementById('notes-section').innerHTML = `
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+          <h4 class="m-0">${currentEditingNoteId ? 'Edit Note' : 'Create New Note'}</h4>
+          <button class="btn btn-outline-danger" onclick="logout()">Logout</button>
+        </div>
+        <form id="note-form" class="card p-4 shadow-sm mb-4" enctype="multipart/form-data">
+          <div class="mb-3">
+            <input type="text" id="note-title" class="form-control" placeholder="Note title" />
+          </div>
+          <div class="mb-3">
+            <textarea id="note-content" class="form-control" rows="3" placeholder="Note content"></textarea>
+          </div>
+          <div class="mb-3">
+            <input type="file" id="note-file" class="form-control" />
+            <div id="existing-attachment" class="attachment-preview"></div>
+          </div>
+          <button class="btn btn-${currentEditingNoteId ? 'primary' : 'success'} w-100">
+            ${currentEditingNoteId ? 'Update Note' : 'Add Note'}
+          </button>
+          ${currentEditingNoteId ? '<button type="button" class="btn btn-outline-secondary w-100 mt-2" onclick="cancelEdit()">Cancel</button>' : ''}
+        </form>
+        <input type="text" id="search-query" class="form-control mb-3" placeholder="Search notes..." onkeyup="searchNotes()" />
+        <ul id="note-list" class="list-group"></ul>`;
+
+      document.getElementById('note-form').addEventListener('submit', currentEditingNoteId ? updateNote : createNote);
+      if (currentEditingNoteId) await loadNoteForEditing(currentEditingNoteId);
+
       const res = await fetch(`${API_URL}/note`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
       renderNotes(data.data);
+    }
+
+
+ async function loadNoteForEditing(noteId) {
+      const res = await fetch(`${API_URL}/note/${noteId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.status === 'success') {
+        document.getElementById('note-title').value = data.data.title;
+        document.getElementById('note-content').value = data.data.content;
+        const attachment = data.data.attachments?.[0];
+        if (attachment) {
+          currentEditingAttachment = attachment;
+          document.getElementById('existing-attachment').innerHTML = `📎 <a href="${attachment.url}" target="_blank">${attachment.filename}</a>`;
+        } else {
+          currentEditingAttachment = null;
+          document.getElementById('existing-attachment').innerHTML = '';
+        }
+      } else {
+        Swal.fire('Error', data.message || 'Failed to load note', 'error');
+      }
+    }
+
+    function cancelEdit() {
+      currentEditingNoteId = null;
+      fetchNotes();
+    }
+
+    function logout() {
+      token = '';
+      currentEditingNoteId = null;
+      toggleSections(false);
+      Swal.fire('Logged out', '', 'info');
     }
 
     async function createNote(event) {
@@ -116,33 +272,94 @@
       const content = document.getElementById('note-content').value;
       const file = document.getElementById('note-file').files[0];
 
-      const noteRes = await fetch(`${API_URL}/note`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ title, content })
-      });
-
-      const noteData = await noteRes.json();
-      if (noteData.status === 'success') {
-        if (file) {
-          const formData = new FormData();
-          formData.append('file', file);
-
-          await fetch(`${API_URL}/note/${noteData.data.noteId}/attachment`, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${token}` },
-            body: formData
-          });
-        }
-        Swal.fire('Note added', '', 'success');
-        fetchNotes();
-        document.getElementById('note-form').reset();
-      } else {
-        Swal.fire('Error', noteData.message || 'Failed to create note', 'error');
+      if (!title || !content) {
+        Swal.fire('Error', 'Title and content are required', 'error');
+        return;
       }
+
+      try {
+        const noteRes = await fetch(`${API_URL}/note`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ title, content })
+        });
+
+        const noteData = await noteRes.json();
+        if (noteData.status === 'success') {
+          if (file) {
+            const formData = new FormData();
+            formData.append('file', file);
+            await fetch(`${API_URL}/note/${noteData.data.noteId}/attachment`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${token}` },
+              body: formData
+            });
+          }
+          Swal.fire('Note added', '', 'success');
+          document.getElementById('note-form').reset();
+          fetchNotes();
+        } else {
+          Swal.fire('Error', noteData.message || 'Failed to create note', 'error');
+        }
+      } catch (error) {
+        Swal.fire('Error', error.message, 'error');
+      }
+    }
+
+ async function updateNote(event) {
+      event.preventDefault();
+      const title = document.getElementById('note-title').value;
+      const content = document.getElementById('note-content').value;
+      const file = document.getElementById('note-file').files[0];
+
+      if (!title || !content) {
+        Swal.fire('Error', 'Title and content are required', 'error');
+        return;
+      }
+
+      try {
+        const noteRes = await fetch(`${API_URL}/note/${currentEditingNoteId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ title, content })
+        });
+
+        const noteData = await noteRes.json();
+        if (noteData.status === 'success') {
+          if (file) {
+            await fetch(`${API_URL}/note/${currentEditingNoteId}/attachment`, {
+              method: 'DELETE',
+              headers: { Authorization: `Bearer ${token}` }
+            });
+            const formData = new FormData();
+            formData.append('file', file);
+            await fetch(`${API_URL}/note/${currentEditingNoteId}/attachment`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${token}` },
+              body: formData
+            });
+          }
+          Swal.fire('Note updated', '', 'success');
+          currentEditingNoteId = null;
+          currentEditingAttachment = null;
+          fetchNotes();
+        } else {
+          Swal.fire('Error', noteData.message || 'Failed to update note', 'error');
+        }
+      } catch (error) {
+        Swal.fire('Error', error.message, 'error');
+      }
+    }
+
+    async function editNote(noteId) {
+      currentEditingNoteId = noteId;
+      fetchNotes();
     }
 
     async function searchNotes() {
@@ -158,7 +375,6 @@
     function renderNotes(notes) {
       const list = document.getElementById('note-list');
       list.innerHTML = '';
-
       if (notes?.length) {
         notes.forEach(note => {
           const item = document.createElement('li');
@@ -167,10 +383,10 @@
           item.innerHTML = `
             <div class="d-flex justify-content-between align-items-center">
               <div>
-                <strong>${note.title}</strong><br/><small>${note.content}</small>${attachment}
+                <strong>${note.title}</strong><br/><small class="note-content">${note.content}</small>${attachment}
               </div>
               <div class="btn-group">
-                <button class="btn btn-sm btn-warning" onclick='updateNotePrompt("${note.noteId}", ${JSON.stringify(note.title)}, ${JSON.stringify(note.content)}, ${JSON.stringify(note.attachments || [])})'>Edit</button>
+                <button class="btn btn-sm btn-primary" onclick="editNote('${note.noteId}')">Edit</button>
                 <button class="btn btn-sm btn-danger" onclick="deleteNote('${note.noteId}')">Delete</button>
               </div>
             </div>`;
@@ -195,71 +411,6 @@
         });
         Swal.fire('Deleted!', '', 'success');
         fetchNotes();
-      }
-    }
-
-    async function updateNotePrompt(noteId, oldTitle, oldContent, attachments = []) {
-      const htmlContent =
-        `<input id="swal-input1" class="swal2-input" placeholder="Title" value="${oldTitle}">` +
-        `<textarea id="swal-input2" class="swal2-textarea" placeholder="Content">${oldContent}</textarea>` +
-        (attachments.length
-          ? `<div style="text-align:left;font-size:0.85rem;margin-top:10px;">
-               <strong>Attachments:</strong><br>
-               ${attachments.map(a => `<a href="${a.url}" target="_blank">${a.filename}</a>`).join('<br>')}<br><br>
-               <input type="file" id="edit-file" class="form-control mt-2" />
-             </div>`
-          : '<input type="file" id="edit-file" class="form-control mt-2" />');
-
-      const { value: formValues } = await Swal.fire({
-        title: 'Update Note',
-        html: htmlContent,
-        focusConfirm: false,
-        confirmButtonText: 'Save',
-        showCancelButton: true,
-        preConfirm: () => {
-          const title = document.getElementById('swal-input1')?.value?.trim();
-          const content = document.getElementById('swal-input2')?.value?.trim();
-          const file = document.getElementById('edit-file')?.files[0];
-          if (!title || !content) {
-            Swal.showValidationMessage('Both title and content are required.');
-            return false;
-          }
-          return [title, content, file];
-        }
-      });
-
-      if (formValues) {
-        const [title, content, file] = formValues;
-        try {
-          const res = await fetch(`${API_URL}/note/${noteId}`, {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`
-            },
-            body: JSON.stringify({ title, content })
-          });
-          const data = await res.json();
-
-          if (data.status === 'success' && file) {
-            const formData = new FormData();
-            formData.append('file', file);
-            await fetch(`${API_URL}/note/${noteId}/attachment`, {
-              method: 'POST',
-              headers: { Authorization: `Bearer ${token}` },
-              body: formData
-            });
-          }
-
-          if (data.status === 'success') {
-            Swal.fire('Note updated!', '', 'success');
-            fetchNotes();
-          } else {
-            Swal.fire('Error', data.message || 'Failed to update note', 'error');
-          }
-        } catch (error) {
-          Swal.fire('Error', error.message, 'error');
-        }
       }
     }
   </script>
