@@ -170,7 +170,7 @@
                 <strong>${note.title}</strong><br/><small>${note.content}</small>${attachment}
               </div>
               <div class="btn-group">
-                <button class="btn btn-sm btn-warning" onclick="updateNotePrompt('${note.noteId}', '${note.title}', '${note.content}')">Edit</button>
+                <button class="btn btn-sm btn-warning" onclick='updateNotePrompt("${note.noteId}", ${JSON.stringify(note.title)}, ${JSON.stringify(note.content)}, ${JSON.stringify(note.attachments || [])})'>Edit</button>
                 <button class="btn btn-sm btn-danger" onclick="deleteNote('${note.noteId}')">Delete</button>
               </div>
             </div>`;
@@ -198,37 +198,67 @@
       }
     }
 
-    async function updateNotePrompt(noteId, oldTitle, oldContent) {
+    async function updateNotePrompt(noteId, oldTitle, oldContent, attachments = []) {
+      const htmlContent =
+        `<input id="swal-input1" class="swal2-input" placeholder="Title" value="${oldTitle}">` +
+        `<textarea id="swal-input2" class="swal2-textarea" placeholder="Content">${oldContent}</textarea>` +
+        (attachments.length
+          ? `<div style="text-align:left;font-size:0.85rem;margin-top:10px;">
+               <strong>Attachments:</strong><br>
+               ${attachments.map(a => `<a href="${a.url}" target="_blank">${a.filename}</a>`).join('<br>')}<br><br>
+               <input type="file" id="edit-file" class="form-control mt-2" />
+             </div>`
+          : '<input type="file" id="edit-file" class="form-control mt-2" />');
+
       const { value: formValues } = await Swal.fire({
         title: 'Update Note',
-        html:
-          `<input id="swal-input1" class="swal2-input" value="${oldTitle}">` +
-          `<textarea id="swal-input2" class="swal2-textarea">${oldContent}</textarea>`,
+        html: htmlContent,
         focusConfirm: false,
+        confirmButtonText: 'Save',
+        showCancelButton: true,
         preConfirm: () => {
-          return [
-            document.getElementById('swal-input1').value,
-            document.getElementById('swal-input2').value
-          ];
+          const title = document.getElementById('swal-input1')?.value?.trim();
+          const content = document.getElementById('swal-input2')?.value?.trim();
+          const file = document.getElementById('edit-file')?.files[0];
+          if (!title || !content) {
+            Swal.showValidationMessage('Both title and content are required.');
+            return false;
+          }
+          return [title, content, file];
         }
       });
 
       if (formValues) {
-        const [title, content] = formValues;
-        const res = await fetch(`${API_URL}/note/${noteId}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`
-          },
-          body: JSON.stringify({ title, content })
-        });
-        const data = await res.json();
-        if (data.status === 'success') {
-          Swal.fire('Note updated!', '', 'success');
-          fetchNotes();
-        } else {
-          Swal.fire('Error', data.message, 'error');
+        const [title, content, file] = formValues;
+        try {
+          const res = await fetch(`${API_URL}/note/${noteId}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({ title, content })
+          });
+          const data = await res.json();
+
+          if (data.status === 'success' && file) {
+            const formData = new FormData();
+            formData.append('file', file);
+            await fetch(`${API_URL}/note/${noteId}/attachment`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${token}` },
+              body: formData
+            });
+          }
+
+          if (data.status === 'success') {
+            Swal.fire('Note updated!', '', 'success');
+            fetchNotes();
+          } else {
+            Swal.fire('Error', data.message || 'Failed to update note', 'error');
+          }
+        } catch (error) {
+          Swal.fire('Error', error.message, 'error');
         }
       }
     }
