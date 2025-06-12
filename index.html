@@ -5,114 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Notes App Interface</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <script>
-    const API_URL = 'https://quick-notes-backend-one.vercel.app/api';
-    let token = '';
-
-    async function login(event) {
-      event.preventDefault();
-      const username = document.getElementById('username').value;
-      const password = document.getElementById('password').value;
-
-      const res = await fetch(`${API_URL}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
-      });
-      const data = await res.json();
-
-      if (data.status === 'success') {
-        token = data.data.token;
-        showAlert('Login successful!', 'success');
-        toggleSections(true);
-        fetchNotes();
-      } else {
-        showAlert(data.message || 'Login failed', 'danger');
-      }
+  <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11.7.3/dist/sweetalert2.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <style>
+    @media (max-width: 576px) {
+      h1 { font-size: 1.5rem; }
     }
-
-    async function fetchNotes() {
-      const res = await fetch(`${API_URL}/note`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-
-      const list = document.getElementById('note-list');
-      list.innerHTML = '';
-
-      if (data.data?.length) {
-        data.data.forEach(note => {
-          const item = document.createElement('li');
-          item.className = 'list-group-item d-flex justify-content-between align-items-center';
-          item.innerHTML = `
-            <div>
-              <strong>${note.title}</strong><br/>
-              <small>${note.content}</small>
-            </div>
-          `;
-          list.appendChild(item);
-        });
-      } else {
-        list.innerHTML = `<li class="list-group-item text-muted">No notes found.</li>`;
-      }
-    }
-
-    async function createNote(event) {
-      event.preventDefault();
-      const title = document.getElementById('note-title').value;
-      const content = document.getElementById('note-content').value;
-
-      const res = await fetch(`${API_URL}/note`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ title, content })
-      });
-
-      const data = await res.json();
-      if (data.status === 'success') {
-        showAlert('Note added successfully!', 'success');
-        fetchNotes();
-        document.getElementById('note-form').reset();
-      } else {
-        showAlert(data.message || 'Gagal membuat catatan', 'danger');
-      }
-    }
-
-    function logout() {
-      token = '';
-      showAlert('Logged out successfully!', 'info');
-      toggleSections(false);
-    }
-
-    function toggleSections(isLoggedIn) {
-      document.getElementById('login-section').classList.toggle('d-none', isLoggedIn);
-      document.getElementById('notes-section').classList.toggle('d-none', !isLoggedIn);
-    }
-
-    function showAlert(message, type = 'info') {
-      const alertContainer = document.getElementById('alert-container');
-      alertContainer.innerHTML = `
-        <div class="alert alert-${type} alert-dismissible fade show" role="alert">
-          ${message}
-          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-      `;
-    }
-  </script>
+  </style>
 </head>
 <body class="bg-light">
   <div class="container py-5">
     <h1 class="mb-4 text-center">📝 Notes App</h1>
 
-    <div id="alert-container"></div>
-
     <!-- Login Form -->
     <div id="login-section" class="card p-4 shadow-sm mx-auto" style="max-width: 400px;">
       <h4 class="mb-3 text-center">Login</h4>
-      <form onsubmit="login(event)">
+      <form id="login-form">
         <div class="mb-3">
           <label class="form-label">Username</label>
           <input type="text" id="username" class="form-control" required />
@@ -127,24 +35,204 @@
 
     <!-- Notes Interface -->
     <div id="notes-section" class="d-none">
-      <div class="d-flex justify-content-between align-items-center mb-3">
-        <h4>Create New Note</h4>
+      <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <h4 class="m-0">Create New Note</h4>
         <button class="btn btn-outline-danger" onclick="logout()">Logout</button>
       </div>
 
-      <form id="note-form" onsubmit="createNote(event)" class="card p-4 shadow-sm mb-4">
+      <form id="note-form" class="card p-4 shadow-sm mb-4" enctype="multipart/form-data">
         <div class="mb-3">
           <input type="text" id="note-title" class="form-control" placeholder="Note title" required />
         </div>
         <div class="mb-3">
           <textarea id="note-content" class="form-control" rows="3" placeholder="Note content" required></textarea>
         </div>
+        <div class="mb-3">
+          <input type="file" id="note-file" class="form-control" />
+        </div>
         <button class="btn btn-success w-100">Add Note</button>
       </form>
+
+      <input type="text" id="search-query" class="form-control mb-3" placeholder="Search notes..." onkeyup="searchNotes()" />
 
       <ul id="note-list" class="list-group"></ul>
     </div>
   </div>
+
+  <script>
+    const API_URL = 'https://quick-notes-backend-one.vercel.app/api';
+    let token = '';
+
+    document.getElementById('login-form').addEventListener('submit', login);
+    document.getElementById('note-form').addEventListener('submit', createNote);
+
+    async function login(event) {
+      event.preventDefault();
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+
+      try {
+        const res = await fetch(`${API_URL}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+          token = data.data.token;
+          Swal.fire('Login successful!', '', 'success');
+          toggleSections(true);
+          fetchNotes();
+        } else {
+          Swal.fire('Login failed', data.message || 'Invalid credentials', 'error');
+        }
+      } catch (error) {
+        Swal.fire('Error', error.message, 'error');
+      }
+    }
+
+    function logout() {
+      token = '';
+      toggleSections(false);
+      Swal.fire('Logged out', '', 'info');
+    }
+
+    function toggleSections(isLoggedIn) {
+      document.getElementById('login-section').classList.toggle('d-none', isLoggedIn);
+      document.getElementById('notes-section').classList.toggle('d-none', !isLoggedIn);
+    }
+
+    async function fetchNotes() {
+      const res = await fetch(`${API_URL}/note`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      renderNotes(data.data);
+    }
+
+    async function createNote(event) {
+      event.preventDefault();
+      const title = document.getElementById('note-title').value;
+      const content = document.getElementById('note-content').value;
+      const file = document.getElementById('note-file').files[0];
+
+      const noteRes = await fetch(`${API_URL}/note`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ title, content })
+      });
+
+      const noteData = await noteRes.json();
+      if (noteData.status === 'success') {
+        if (file) {
+          const formData = new FormData();
+          formData.append('file', file);
+
+          await fetch(`${API_URL}/note/${noteData.data.noteId}/attachment`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+            body: formData
+          });
+        }
+        Swal.fire('Note added', '', 'success');
+        fetchNotes();
+        document.getElementById('note-form').reset();
+      } else {
+        Swal.fire('Error', noteData.message || 'Failed to create note', 'error');
+      }
+    }
+
+    async function searchNotes() {
+      const query = document.getElementById('search-query').value;
+      if (!query) return fetchNotes();
+      const res = await fetch(`${API_URL}/note/search/${query}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      renderNotes(data.data);
+    }
+
+    function renderNotes(notes) {
+      const list = document.getElementById('note-list');
+      list.innerHTML = '';
+
+      if (notes?.length) {
+        notes.forEach(note => {
+          const item = document.createElement('li');
+          item.className = 'list-group-item';
+          const attachment = note.attachments?.length ? `<br/><a href="${note.attachments[0].url}" target="_blank">📎 ${note.attachments[0].filename}</a>` : '';
+          item.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <strong>${note.title}</strong><br/><small>${note.content}</small>${attachment}
+              </div>
+              <div class="btn-group">
+                <button class="btn btn-sm btn-warning" onclick="updateNotePrompt('${note.noteId}', '${note.title}', '${note.content}')">Edit</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteNote('${note.noteId}')">Delete</button>
+              </div>
+            </div>`;
+          list.appendChild(item);
+        });
+      } else {
+        list.innerHTML = '<li class="list-group-item text-muted">No notes found.</li>';
+      }
+    }
+
+    async function deleteNote(noteId) {
+      const confirm = await Swal.fire({
+        title: 'Delete this note?',
+        showCancelButton: true,
+        confirmButtonText: 'Delete',
+        icon: 'warning'
+      });
+      if (confirm.isConfirmed) {
+        await fetch(`${API_URL}/note/${noteId}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        Swal.fire('Deleted!', '', 'success');
+        fetchNotes();
+      }
+    }
+
+    async function updateNotePrompt(noteId, oldTitle, oldContent) {
+      const { value: formValues } = await Swal.fire({
+        title: 'Update Note',
+        html:
+          `<input id="swal-input1" class="swal2-input" value="${oldTitle}">` +
+          `<textarea id="swal-input2" class="swal2-textarea">${oldContent}</textarea>`,
+        focusConfirm: false,
+        preConfirm: () => {
+          return [
+            document.getElementById('swal-input1').value,
+            document.getElementById('swal-input2').value
+          ];
+        }
+      });
+
+      if (formValues) {
+        const [title, content] = formValues;
+        const res = await fetch(`${API_URL}/note/${noteId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ title, content })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+          Swal.fire('Note updated!', '', 'success');
+          fetchNotes();
+        } else {
+          Swal.fire('Error', data.message, 'error');
+        }
+      }
+    }
+  </script>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
