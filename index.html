@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Notes App Interface</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <script>
@@ -17,18 +17,17 @@
       const res = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({ username, password })
       });
       const data = await res.json();
+
       if (data.status === 'success') {
         token = data.data.token;
-        alert('Login successful!');
-        document.getElementById('login-section').classList.add('d-none');
-        document.getElementById('notes-section').classList.remove('d-none');
+        showAlert('Login successful!', 'success');
+        toggleSections(true);
         fetchNotes();
       } else {
-        alert(data.message || 'Login failed');
+        showAlert(data.message || 'Login failed', 'danger');
       }
     }
 
@@ -37,14 +36,25 @@
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
+
       const list = document.getElementById('note-list');
       list.innerHTML = '';
-      data.data.forEach(note => {
-        const item = document.createElement('li');
-        item.className = 'list-group-item';
-        item.textContent = `${note.title} - ${note.content}`;
-        list.appendChild(item);
-      });
+
+      if (data.data?.length) {
+        data.data.forEach(note => {
+          const item = document.createElement('li');
+          item.className = 'list-group-item d-flex justify-content-between align-items-center';
+          item.innerHTML = `
+            <div>
+              <strong>${note.title}</strong><br/>
+              <small>${note.content}</small>
+            </div>
+          `;
+          list.appendChild(item);
+        });
+      } else {
+        list.innerHTML = `<li class="list-group-item text-muted">No notes found.</li>`;
+      }
     }
 
     async function createNote(event) {
@@ -63,48 +73,79 @@
 
       const data = await res.json();
       if (data.status === 'success') {
+        showAlert('Note added successfully!', 'success');
         fetchNotes();
         document.getElementById('note-form').reset();
       } else {
-        alert(data.message || 'Gagal membuat catatan');
+        showAlert(data.message || 'Gagal membuat catatan', 'danger');
       }
+    }
+
+    function logout() {
+      token = '';
+      showAlert('Logged out successfully!', 'info');
+      toggleSections(false);
+    }
+
+    function toggleSections(isLoggedIn) {
+      document.getElementById('login-section').classList.toggle('d-none', isLoggedIn);
+      document.getElementById('notes-section').classList.toggle('d-none', !isLoggedIn);
+    }
+
+    function showAlert(message, type = 'info') {
+      const alertContainer = document.getElementById('alert-container');
+      alertContainer.innerHTML = `
+        <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+          ${message}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      `;
     }
   </script>
 </head>
 <body class="bg-light">
   <div class="container py-5">
-    <h1 class="mb-4 text-center">Notes App Interface</h1>
+    <h1 class="mb-4 text-center">📝 Notes App</h1>
+
+    <div id="alert-container"></div>
 
     <!-- Login Form -->
-    <div id="login-section">
-      <form onsubmit="login(event)" class="card p-4 shadow-sm">
+    <div id="login-section" class="card p-4 shadow-sm mx-auto" style="max-width: 400px;">
+      <h4 class="mb-3 text-center">Login</h4>
+      <form onsubmit="login(event)">
         <div class="mb-3">
           <label class="form-label">Username</label>
-          <input type="text" id="username" class="form-control" required>
+          <input type="text" id="username" class="form-control" required />
         </div>
         <div class="mb-3">
           <label class="form-label">Password</label>
-          <input type="password" id="password" class="form-control" required>
+          <input type="password" id="password" class="form-control" required />
         </div>
-        <button class="btn btn-primary">Login</button>
+        <button class="btn btn-primary w-100">Login</button>
       </form>
     </div>
 
-    <!-- Notes Area -->
+    <!-- Notes Interface -->
     <div id="notes-section" class="d-none">
-      <form onsubmit="createNote(event)" class="card p-4 shadow-sm mb-4">
-        <h4 class="mb-3">Create Note</h4>
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4>Create New Note</h4>
+        <button class="btn btn-outline-danger" onclick="logout()">Logout</button>
+      </div>
+
+      <form id="note-form" onsubmit="createNote(event)" class="card p-4 shadow-sm mb-4">
         <div class="mb-3">
-          <input type="text" id="note-title" class="form-control" placeholder="Title" required>
+          <input type="text" id="note-title" class="form-control" placeholder="Note title" required />
         </div>
         <div class="mb-3">
-          <textarea id="note-content" class="form-control" placeholder="Content" required></textarea>
+          <textarea id="note-content" class="form-control" rows="3" placeholder="Note content" required></textarea>
         </div>
-        <button class="btn btn-success">Add Note</button>
+        <button class="btn btn-success w-100">Add Note</button>
       </form>
 
       <ul id="note-list" class="list-group"></ul>
     </div>
   </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
