@@ -1,3 +1,10 @@
+async function handleForm(e) {
+  // Get references to the container
+  const formsContainer = document.getElementById("forms-container");
+  // Start the injection process
+  injectForms(formsContainer);
+}
+
 // Handle form submissions
 async function handleLogin(e) {
   e.preventDefault();

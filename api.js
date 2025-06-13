@@ -1,3 +1,5 @@
+const API_URL = "https://quick-notes-backend-one.vercel.app/api";
+
 async function createNote(event) {
   event.preventDefault();
   const title = document.getElementById("note-title").value;
