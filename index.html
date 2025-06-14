@@ -11,12 +11,25 @@
     @media (max-width: 576px) {
       h1 { font-size: 1.5rem; }
     }
+    /* Custom styles for better UI */
     .note-content {
-      white-space: pre-wrap;
+      white-space: pre-wrap; /* Preserves whitespace and line breaks in content */
+      word-wrap: break-word; /* Breaks long words if needed */
     }
     .form-section {
       max-width: 400px;
       margin: 0 auto;
+    }
+    .attachment-preview img, .list-group-item img {
+      max-width: 100px; /* Smaller preview in list */
+      max-height: 100px;
+      border-radius: 5px;
+      margin-top: 5px;
+    }
+    /* Styles specifically for SweetAlert2 inputs for better consistency */
+    .swal2-input, .swal2-textarea {
+        width: calc(100% - 20px) !important; /* Adjust width to fit SweetAlert2 */
+        margin: 10px auto !important; /* Center inputs */
     }
   </style>
 </head>
@@ -24,7 +37,6 @@
   <div class="container py-5">
     <h1 class="mb-4 text-center">📝 Notes App</h1>
 
-    <!-- Login Form -->
     <div id="login-section" class="card p-4 shadow-sm form-section">
       <h4 class="mb-3 text-center">Login</h4>
       <form id="login-form">
@@ -36,248 +48,127 @@
           <label class="form-label">Password</label>
           <input type="password" id="password" class="form-control" required />
         </div>
-        <div class="mb-3 text-end">
-          <a href="#" id="forgot-password-link">Forgot Password?</a>
-        </div>
         <button class="btn btn-primary w-100">Login</button>
-        <div class="text-center mt-3">
-          <small>Don't have an account? <a href="#" id="register-link">Register</a></small>
-        </div>
       </form>
     </div>
 
-    <!-- Register Form -->
-    <div id="register-section" class="card p-4 shadow-sm form-section d-none">
-      <h4 class="mb-3 text-center">Register</h4>
-      <form id="register-form">
-        <div class="mb-3">
-          <label class="form-label">Username</label>
-          <input type="text" id="reg-username" class="form-control" required />
-        </div>
-        <div class="mb-3">
-          <label class="form-label">Email</label>
-          <input type="email" id="reg-email" class="form-control" required />
-        </div>
-        <div class="mb-3">
-          <label class="form-label">Password</label>
-          <input type="password" id="reg-password" class="form-control" required />
-        </div>
-        <button class="btn btn-success w-100">Register</button>
-        <div class="text-center mt-3">
-          <small>Already have an account? <a href="#" id="login-link">Login</a></small>
-        </div>
-      </form>
-    </div>
-
-    <!-- Forgot Password Form -->
-    <div id="forgot-section" class="card p-4 shadow-sm form-section d-none">
-      <h4 class="mb-3 text-center">Reset Password</h4>
-      <form id="forgot-form">
-        <div class="mb-3">
-          <label class="form-label">Username</label>
-          <input type="text" id="forgot-username" class="form-control" required />
-        </div>
-        <button class="btn btn-warning w-100">Send Reset Link</button>
-        <div class="text-center mt-3">
-          <small><a href="#" id="back-to-login">Back to Login</a></small>
-        </div>
-      </form>
-    </div>
-
-    <!-- Notes Interface -->
     <div id="notes-section" class="d-none">
-      <!-- The notes interface is inserted via JavaScript after login -->
+      <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <h4 class="m-0">Create New Note</h4>
+        <button class="btn btn-outline-danger" onclick="logout()">Logout</button>
+      </div>
+
+      <form id="note-form" class="card p-4 shadow-sm mb-4" enctype="multipart/form-data">
+        <div class="mb-3">
+          <input type="text" id="note-title" class="form-control" placeholder="Note title" required />
+        </div>
+        <div class="mb-3">
+          <textarea id="note-content" class="form-control" rows="3" placeholder="Note content" required></textarea>
+        </div>
+        <div class="mb-3">
+          <label for="note-file" class="form-label">Attachment (Optional)</label>
+          <input type="file" id="note-file" class="form-control" accept="image/*, application/pdf" />
+        </div>
+        <button class="btn btn-success w-100">Add Note</button>
+      </form>
+
+      <input type="text" id="search-query" class="form-control mb-3" placeholder="Search notes..." onkeyup="searchNotes()" />
+
+      <ul id="note-list" class="list-group"></ul>
     </div>
   </div>
 
   <script>
+    // API endpoint for your backend
     const API_URL = 'https://quick-notes-backend-one.vercel.app/api';
-    let token = '';
-    let currentEditingNoteId = null;
+    let token = ''; // Stores the authentication token after login
 
-    // Link event listeners
-    document.getElementById('register-link')?.addEventListener('click', showRegisterForm);
-    document.getElementById('login-link')?.addEventListener('click', showLoginForm);
-    document.getElementById('forgot-password-link')?.addEventListener('click', showForgotPassword);
-    document.getElementById('back-to-login')?.addEventListener('click', showLoginForm);
+    // Event listeners for forms
+    document.getElementById('login-form').addEventListener('submit', login);
+    document.getElementById('note-form').addEventListener('submit', createNote);
 
-    function toggleSections(show) {
-      document.getElementById('login-section').classList.toggle('d-none', show);
-      document.getElementById('register-section').classList.add('d-none');
-      document.getElementById('forgot-section').classList.add('d-none');
-      document.getElementById('notes-section').classList.toggle('d-none', !show);
-    }
-
-    function showLoginForm(e) {
-      if (e) e.preventDefault();
-      document.getElementById('login-section').classList.remove('d-none');
-      document.getElementById('register-section').classList.add('d-none');
-      document.getElementById('forgot-section').classList.add('d-none');
-    }
-
-    function showRegisterForm(e) {
-      if (e) e.preventDefault();
-      document.getElementById('register-section').classList.remove('d-none');
-      document.getElementById('login-section').classList.add('d-none');
-      document.getElementById('forgot-section').classList.add('d-none');
-    }
-
-    function showForgotPassword(e) {
-      if (e) e.preventDefault();
-      document.getElementById('forgot-section').classList.remove('d-none');
-      document.getElementById('login-section').classList.add('d-none');
-      document.getElementById('register-section').classList.add('d-none');
-    }
-
-    document.getElementById('login-form').addEventListener('submit', async function(e) {
-      e.preventDefault();
+    /**
+     * Handles user login.
+     * Authenticates with the backend and stores the token.
+     */
+    async function login(event) {
+      event.preventDefault(); // Prevent default form submission
       const username = document.getElementById('username').value;
       const password = document.getElementById('password').value;
+
       try {
         const res = await fetch(`${API_URL}/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username, password })
         });
-        const data = await res.json();
+        const data = await res.json(); // Parse JSON response
+
         if (data.status === 'success') {
-          token = data.data.token;
-          Swal.fire('Login successful!', '', 'success');
-          toggleSections(true);
-          fetchNotes();
+          token = data.data.token; // Store the received token
+          Swal.fire('Login successful!', '', 'success'); // Show success message
+          toggleSections(true); // Show notes interface
+          fetchNotes(); // Load notes for the logged-in user
         } else {
-          Swal.fire('Login failed', data.message || 'Invalid credentials', 'error');
+          Swal.fire('Login failed', data.message || 'Invalid credentials', 'error'); // Show error message
         }
       } catch (error) {
-        Swal.fire('Error', error.message, 'error');
-      }
-    });
-
-    document.getElementById('register-form').addEventListener('submit', async function(e) {
-      e.preventDefault();
-      const username = document.getElementById('reg-username').value;
-      const email = document.getElementById('reg-email').value;
-      const password = document.getElementById('reg-password').value;
-      try {
-        const res = await fetch(`${API_URL}/auth/register`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, email, password })
-        });
-        const data = await res.json();
-        if (data.status === 'success') {
-          Swal.fire('Registration successful!', '', 'success');
-          showLoginForm();
-        } else {
-          Swal.fire('Failed', data.message || 'Registration failed', 'error');
-        }
-      } catch (error) {
-        Swal.fire('Error', error.message, 'error');
-      }
-    });
-
-    document.getElementById('forgot-form').addEventListener('submit', async function(e) {
-      e.preventDefault();
-      const username = document.getElementById('forgot-username').value;
-      try {
-        const res = await fetch(`${API_URL}/auth/forgot-password`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username })
-        });
-        const data = await res.json();
-        if (data.status === 'success') {
-          Swal.fire('Check your email for reset instructions.', '', 'info');
-          showLoginForm();
-        } else {
-          Swal.fire('Error', data.message || 'Failed to send email', 'error');
-        }
-      } catch (error) {
-        Swal.fire('Error', error.message, 'error');
-      }
-    });
-
-async function fetchNotes() {
-      document.getElementById('notes-section').innerHTML = `
-        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-          <h4 class="m-0">${currentEditingNoteId ? 'Edit Note' : 'Create New Note'}</h4>
-          <button class="btn btn-outline-danger" onclick="logout()">Logout</button>
-        </div>
-        <form id="note-form" class="card p-4 shadow-sm mb-4" enctype="multipart/form-data">
-          <div class="mb-3">
-            <input type="text" id="note-title" class="form-control" placeholder="Note title" />
-          </div>
-          <div class="mb-3">
-            <textarea id="note-content" class="form-control" rows="3" placeholder="Note content"></textarea>
-          </div>
-          <div class="mb-3">
-            <input type="file" id="note-file" class="form-control" />
-            <div id="existing-attachment" class="attachment-preview"></div>
-          </div>
-          <button class="btn btn-${currentEditingNoteId ? 'primary' : 'success'} w-100">
-            ${currentEditingNoteId ? 'Update Note' : 'Add Note'}
-          </button>
-          ${currentEditingNoteId ? '<button type="button" class="btn btn-outline-secondary w-100 mt-2" onclick="cancelEdit()">Cancel</button>' : ''}
-        </form>
-        <input type="text" id="search-query" class="form-control mb-3" placeholder="Search notes..." onkeyup="searchNotes()" />
-        <ul id="note-list" class="list-group"></ul>`;
-
-      document.getElementById('note-form').addEventListener('submit', currentEditingNoteId ? updateNote : createNote);
-      if (currentEditingNoteId) await loadNoteForEditing(currentEditingNoteId);
-
-      const res = await fetch(`${API_URL}/note`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-      renderNotes(data.data);
-    }
-
-
- async function loadNoteForEditing(noteId) {
-      const res = await fetch(`${API_URL}/note/${noteId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-      if (data.status === 'success') {
-        document.getElementById('note-title').value = data.data.title;
-        document.getElementById('note-content').value = data.data.content;
-        const attachment = data.data.attachments?.[0];
-        if (attachment) {
-          currentEditingAttachment = attachment;
-          document.getElementById('existing-attachment').innerHTML = `📎 <a href="${attachment.url}" target="_blank">${attachment.filename}</a>`;
-        } else {
-          currentEditingAttachment = null;
-          document.getElementById('existing-attachment').innerHTML = '';
-        }
-      } else {
-        Swal.fire('Error', data.message || 'Failed to load note', 'error');
+        Swal.fire('Error', error.message, 'error'); // Show network/server error
       }
     }
 
-    function cancelEdit() {
-      currentEditingNoteId = null;
-      fetchNotes();
-    }
-
+    /**
+     * Logs out the user.
+     * Clears the token and shows the login interface.
+     */
     function logout() {
-      token = '';
-      currentEditingNoteId = null;
-      toggleSections(false);
-      Swal.fire('Logged out', '', 'info');
+      token = ''; // Clear the authentication token
+      toggleSections(false); // Show login interface
+      Swal.fire('Logged out', '', 'info'); // Inform user
     }
 
+    /**
+     * Toggles visibility between login and notes sections.
+     * @param {boolean} isLoggedIn - True to show notes, false to show login.
+     */
+    function toggleSections(isLoggedIn) {
+      document.getElementById('login-section').classList.toggle('d-none', isLoggedIn);
+      document.getElementById('notes-section').classList.toggle('d-none', !isLoggedIn);
+    }
+
+    /**
+     * Fetches all notes for the authenticated user from the backend.
+     */
+    async function fetchNotes() {
+      try {
+        const res = await fetch(`${API_URL}/note`, {
+          headers: { Authorization: `Bearer ${token}` } // Include auth token
+        });
+        // Pastikan respons adalah JSON. Jika bukan, ini akan gagal.
+        const data = await res.json(); 
+        renderNotes(data.data); // Render the fetched notes
+      } catch (error) {
+        Swal.fire('Error', 'Failed to fetch notes or invalid response from server.', 'error');
+        console.error("Error fetching notes:", error); // Log the actual error for debugging
+      }
+    }
+
+    /**
+     * Creates a new note with optional file attachment.
+     */
     async function createNote(event) {
       event.preventDefault();
       const title = document.getElementById('note-title').value;
       const content = document.getElementById('note-content').value;
-      const file = document.getElementById('note-file').files[0];
+      const file = document.getElementById('note-file').files[0]; // Get the selected file
 
       if (!title || !content) {
-        Swal.fire('Error', 'Title and content are required', 'error');
-        return;
+          Swal.fire('Error', 'Title and content cannot be empty.', 'error');
+          return;
       }
 
       try {
+        // 1. Create the note (text content first)
         const noteRes = await fetch(`${API_URL}/note`, {
           method: 'POST',
           headers: {
@@ -289,18 +180,24 @@ async function fetchNotes() {
 
         const noteData = await noteRes.json();
         if (noteData.status === 'success') {
+          // 2. If a file was selected, upload it as an attachment
           if (file) {
             const formData = new FormData();
-            formData.append('file', file);
-            await fetch(`${API_URL}/note/${noteData.data.noteId}/attachment`, {
+            formData.append('file', file); // Append the file to FormData
+
+            const attachmentRes = await fetch(`${API_URL}/note/${noteData.data.noteId}/attachment`, {
               method: 'POST',
-              headers: { Authorization: `Bearer ${token}` },
+              headers: { Authorization: `Bearer ${token}` }, // No 'Content-Type' for FormData, browser sets it
               body: formData
             });
+            const attachmentData = await attachmentRes.json();
+            if (attachmentData.status !== 'success') {
+                Swal.fire('Warning', 'Note created, but failed to upload attachment: ' + (attachmentData.message || 'Unknown error'), 'warning');
+            }
           }
           Swal.fire('Note added', '', 'success');
-          document.getElementById('note-form').reset();
-          fetchNotes();
+          fetchNotes(); // Refresh the notes list
+          document.getElementById('note-form').reset(); // Clear the form
         } else {
           Swal.fire('Error', noteData.message || 'Failed to create note', 'error');
         }
@@ -309,108 +206,251 @@ async function fetchNotes() {
       }
     }
 
- async function updateNote(event) {
-      event.preventDefault();
-      const title = document.getElementById('note-title').value;
-      const content = document.getElementById('note-content').value;
-      const file = document.getElementById('note-file').files[0];
-
-      if (!title || !content) {
-        Swal.fire('Error', 'Title and content are required', 'error');
-        return;
-      }
+    /**
+     * Searches notes based on a query.
+     * If query is empty, fetches all notes.
+     */
+    async function searchNotes() {
+      const query = document.getElementById('search-query').value.trim();
+      if (!query) return fetchNotes(); // If query is empty, show all notes
 
       try {
-        const noteRes = await fetch(`${API_URL}/note/${currentEditingNoteId}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`
-          },
-          body: JSON.stringify({ title, content })
+        const res = await fetch(`${API_URL}/note/search/${query}`, {
+          headers: { Authorization: `Bearer ${token}` }
         });
-
-        const noteData = await noteRes.json();
-        if (noteData.status === 'success') {
-          if (file) {
-            await fetch(`${API_URL}/note/${currentEditingNoteId}/attachment`, {
-              method: 'DELETE',
-              headers: { Authorization: `Bearer ${token}` }
-            });
-            const formData = new FormData();
-            formData.append('file', file);
-            await fetch(`${API_URL}/note/${currentEditingNoteId}/attachment`, {
-              method: 'POST',
-              headers: { Authorization: `Bearer ${token}` },
-              body: formData
-            });
-          }
-          Swal.fire('Note updated', '', 'success');
-          currentEditingNoteId = null;
-          currentEditingAttachment = null;
-          fetchNotes();
-        } else {
-          Swal.fire('Error', noteData.message || 'Failed to update note', 'error');
-        }
+        const data = await res.json();
+        renderNotes(data.data);
       } catch (error) {
-        Swal.fire('Error', error.message, 'error');
+        Swal.fire('Error', 'Failed to search notes', 'error');
       }
     }
 
-    async function editNote(noteId) {
-      currentEditingNoteId = noteId;
-      fetchNotes();
-    }
-
-    async function searchNotes() {
-      const query = document.getElementById('search-query').value;
-      if (!query) return fetchNotes();
-      const res = await fetch(`${API_URL}/note/search/${query}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-      renderNotes(data.data);
-    }
-
+    /**
+     * Renders the list of notes in the UI.
+     * @param {Array} notes - An array of note objects.
+     */
     function renderNotes(notes) {
       const list = document.getElementById('note-list');
-      list.innerHTML = '';
+      list.innerHTML = ''; // Clear existing notes
+
       if (notes?.length) {
         notes.forEach(note => {
           const item = document.createElement('li');
           item.className = 'list-group-item';
-          const attachment = note.attachments?.length ? `<br/><a href="${note.attachments[0].url}" target="_blank">📎 ${note.attachments[0].filename}</a>` : '';
+
+          let attachmentHtml = '';
+          if (note.attachments && note.attachments.length > 0) {
+            const attachment = note.attachments[0]; // Assuming one attachment per note
+            const isImage = attachment.mimetype.startsWith('image/');
+            attachmentHtml = `
+              <br/>
+              <div class="mt-2">
+                <a href="${attachment.url}" target="_blank" class="text-decoration-none">
+                  ${isImage ? '🖼️' : '📄'} ${attachment.filename}
+                </a>
+                ${isImage ? `<img src="${attachment.url}" class="img-thumbnail mt-2">` : ''}
+              </div>`;
+          }
+
           item.innerHTML = `
-            <div class="d-flex justify-content-between align-items-center">
-              <div>
-                <strong>${note.title}</strong><br/><small class="note-content">${note.content}</small>${attachment}
+            <div class="d-flex justify-content-between align-items-center flex-wrap">
+              <div class="flex-grow-1 me-2">
+                <strong>${note.title}</strong><br/>
+                <div class="note-content text-muted">${note.content}</div>
+                ${attachmentHtml}
               </div>
-              <div class="btn-group">
-                <button class="btn btn-sm btn-primary" onclick="editNote('${note.noteId}')">Edit</button>
+              <div class="btn-group mt-2 mt-md-0">
+                <button class="btn btn-sm btn-warning" onclick='updateNotePrompt("${note.noteId}", ${JSON.stringify(note.title)}, ${JSON.stringify(note.content)}, ${JSON.stringify(note.attachments || [])})'>Edit</button>
                 <button class="btn btn-sm btn-danger" onclick="deleteNote('${note.noteId}')">Delete</button>
               </div>
             </div>`;
           list.appendChild(item);
         });
       } else {
-        list.innerHTML = '<li class="list-group-item text-muted">No notes found.</li>';
+        list.innerHTML = '<li class="list-group-item text-muted text-center">No notes found. Create one!</li>';
       }
     }
 
+    /**
+     * Deletes a note after user confirmation.
+     * @param {string} noteId - The ID of the note to delete.
+     */
     async function deleteNote(noteId) {
-      const confirm = await Swal.fire({
+      const confirmResult = await Swal.fire({
         title: 'Delete this note?',
+        text: "You won't be able to revert this!",
+        icon: 'warning',
         showCancelButton: true,
-        confirmButtonText: 'Delete',
-        icon: 'warning'
+        confirmButtonText: 'Yes, delete it!',
+        cancelButtonColor: '#3085d6',
+        confirmButtonColor: '#d33'
       });
-      if (confirm.isConfirmed) {
-        await fetch(`${API_URL}/note/${noteId}`, {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        Swal.fire('Deleted!', '', 'success');
-        fetchNotes();
+      if (confirmResult.isConfirmed) {
+        try {
+          const res = await fetch(`${API_URL}/note/${noteId}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          const data = await res.json();
+          if (data.status === 'success') {
+            Swal.fire('Deleted!', 'Your note has been deleted.', 'success');
+            fetchNotes(); // Refresh list
+          } else {
+            Swal.fire('Error', data.message || 'Failed to delete note', 'error');
+          }
+        } catch (error) {
+          Swal.fire('Error', 'Failed to delete note', 'error');
+        }
+      }
+    }
+
+    /**
+     * Displays a SweetAlert2 prompt to update a note, including attachment handling.
+     * @param {string} noteId - The ID of the note to update.
+     * @param {string} oldTitle - The current title of the note.
+     * @param {string} oldContent - The current content of the note.
+     * @param {Array} attachments - Array of current attachments (typically just one for this app).
+     */
+    async function updateNotePrompt(noteId, oldTitle, oldContent, attachments = []) {
+      const hasExistingAttachment = attachments.length > 0;
+      const existingAttachment = hasExistingAttachment ? attachments[0] : null;
+
+      let attachmentDisplayHtml = '';
+      if (hasExistingAttachment) {
+        const isImage = existingAttachment.mimetype.startsWith('image/');
+        attachmentDisplayHtml = `
+          <div style="text-align:left;font-size:0.85rem;margin-top:10px;">
+            <strong>Current Attachment:</strong><br>
+            <a href="${existingAttachment.url}" target="_blank">${isImage ? '🖼️' : '📄'} ${existingAttachment.filename}</a>
+            ${isImage ? `<img src="${existingAttachment.url}" class="img-thumbnail mt-2" style="max-width:100px; max-height:100px;">` : ''}
+            <button type="button" id="remove-current-attachment" class="btn btn-sm btn-outline-danger mt-2 w-100">Remove Current Attachment</button>
+          </div>`;
+      }
+
+      const htmlContent =
+        `<input id="swal-input1" class="swal2-input" placeholder="Title" value="${oldTitle}">` +
+        `<textarea id="swal-input2" class="swal2-textarea" placeholder="Content">${oldContent}</textarea>` +
+        attachmentDisplayHtml + // Display existing attachment if any
+        `<div class="mt-3">
+           <label for="edit-file" class="form-label">${hasExistingAttachment ? 'Upload New File (replaces current)' : 'Upload File'}</label>
+           <input type="file" id="edit-file" class="form-control" accept="image/*, application/pdf" />
+         </div>`;
+
+      const { value: formValues, isConfirmed } = await Swal.fire({
+        title: 'Update Note',
+        html: htmlContent,
+        focusConfirm: false,
+        confirmButtonText: 'Save',
+        showCancelButton: true,
+        preConfirm: () => {
+          const title = document.getElementById('swal-input1')?.value?.trim();
+          const content = document.getElementById('swal-input2')?.value?.trim();
+          const file = document.getElementById('edit-file')?.files[0];
+          
+          if (!title || !content) {
+            Swal.showValidationMessage('Both title and content are required.');
+            return false;
+          }
+          return { title, content, file }; // Return as an object for clarity
+        },
+        didOpen: (popup) => {
+            // Attach event listener to the "Remove Current Attachment" button
+            const removeButton = popup.querySelector('#remove-current-attachment');
+            if (removeButton) {
+                removeButton.onclick = () => {
+                    // Visually update the modal to remove the attachment display
+                    Swal.update({
+                        html: // Re-render HTML without the attachment and the remove button
+                            `<input id="swal-input1" class="swal2-input" placeholder="Title" value="${document.getElementById('swal-input1').value}">` +
+                            `<textarea id="swal-input2" class="swal2-textarea" placeholder="Content">${document.getElementById('swal-input2').value}</textarea>` +
+                            `<div class="mt-3">
+                               <label for="edit-file" class="form-label">Upload File</label>
+                               <input type="file" id="edit-file" class="form-control" accept="image/*, application/pdf" />
+                             </div>`,
+                        // Add a class to the popup to indicate attachment removal intent
+                        customClass: {
+                            popup: 'attachment-removed' // This class indicates intent to remove
+                        }
+                    });
+                    // Clear the file input in case a new one was selected before removing
+                    const fileInput = popup.querySelector('#edit-file');
+                    if (fileInput) fileInput.value = '';
+                };
+            }
+        },
+        willClose: (popup) => {
+             // Clean up the custom class when closing the modal
+             popup.classList.remove('attachment-removed');
+        }
+      });
+
+      if (isConfirmed && formValues) {
+        const { title, content, file } = formValues;
+        // Check if the 'attachment-removed' class was present on the popup during preConfirm
+        const attachmentRemovedExplicitly = Swal.getPopup().classList.contains('attachment-removed');
+
+        try {
+          // 1. Update the note's title and content
+          const res = await fetch(`${API_URL}/note/${noteId}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({ title, content })
+          });
+          const data = await res.json();
+
+          if (data.status === 'success') {
+            // 2. Handle attachment changes
+            if (file) { // A new file has been selected by the user
+                // If there was an existing attachment, delete it first for explicit replacement
+                if (hasExistingAttachment) {
+                    const deleteOldRes = await fetch(`${API_URL}/note/${noteId}/attachment`, {
+                        method: 'DELETE',
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    const deleteOldData = await deleteOldRes.json();
+                    if (deleteOldData.status !== 'success' && !deleteOldData.message.includes('No attachment found')) {
+                        // Log a warning if deletion failed but don't block the new upload
+                        console.warn('Failed to delete old attachment:', deleteOldData.message);
+                    }
+                }
+
+                // Upload the new file
+                const formData = new FormData();
+                formData.append('file', file);
+                const uploadRes = await fetch(`${API_URL}/note/${noteId}/attachment`, {
+                    method: 'POST',
+                    headers: { Authorization: `Bearer ${token}` }, // No 'Content-Type' for FormData
+                    body: formData
+                });
+                const uploadData = await uploadRes.json();
+                if (uploadData.status !== 'success') {
+                    Swal.fire('Warning', 'Note updated, but failed to upload new attachment: ' + (uploadData.message || 'Unknown error'), 'warning');
+                }
+            } else if (attachmentRemovedExplicitly && hasExistingAttachment) {
+                // User explicitly clicked "Remove Current Attachment" AND no new file was selected
+                // This means the user wants to delete the existing attachment.
+                const deleteRes = await fetch(`${API_URL}/note/${noteId}/attachment`, {
+                    method: 'DELETE',
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const deleteData = await deleteRes.json();
+                if (deleteData.status !== 'success') {
+                    Swal.fire('Warning', 'Note updated, but failed to remove attachment: ' + (deleteData.message || 'Unknown error'), 'warning');
+                }
+            }
+            // If neither of the above (no new file, no explicit removal), existing attachment is kept.
+
+            Swal.fire('Note updated!', '', 'success');
+            fetchNotes(); // Re-fetch notes to reflect all changes (text and attachment)
+          } else {
+            Swal.fire('Error', data.message || 'Failed to update note', 'error');
+          }
+        } catch (error) {
+          Swal.fire('Error', error.message, 'error');
+        }
       }
     }
   </script>
