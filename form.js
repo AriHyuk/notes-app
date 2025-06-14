@@ -136,14 +136,12 @@ async function injectForms(formsContainer) {
 // Load HTML form templates
 async function loadFormTemplate(path) {
   try {
-    console.log(`Attempting to load: ${path}`);
     const response = await fetch(path);
     if (!response.ok) {
       console.error(`Failed to load ${path}: Status ${response.status}`);
       throw new Error(`Failed to load ${path}: ${response.status}`);
     }
     const text = await response.text();
-    console.log(`Successfully loaded ${path}, content length: ${text.length}`);
     return text;
   } catch (error) {
     console.error(`Error loading form template ${path}:`, error);
